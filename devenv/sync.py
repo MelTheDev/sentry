@@ -138,20 +138,6 @@ Then, use it to run sync this one time.
     print(f"ensuring {repo} venv at {venv_dir}...")
     venv.ensure(venv_dir, python_version, url, sha256)
 
-    if constants.DARWIN:
-        colima.install(
-            repo_config["colima"]["version"],
-            repo_config["colima"][constants.SYSTEM_MACHINE],
-            repo_config["colima"][f"{constants.SYSTEM_MACHINE}_sha256"],
-            reporoot,
-        )
-        limactl.install(
-            repo_config["lima"]["version"],
-            repo_config["lima"][constants.SYSTEM_MACHINE],
-            repo_config["lima"][f"{constants.SYSTEM_MACHINE}_sha256"],
-            reporoot,
-        )
-
     if not run_procs(
         repo,
         reporoot,
