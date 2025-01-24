@@ -18,9 +18,9 @@ from sentry.workflow_engine.endpoints.validators.base import (
     BaseGroupTypeDetectorValidator,
     NumericComparisonConditionValidator,
 )
-from sentry.workflow_engine.models.data_condition import Condition
+from sentry.workflow_engine.models.data_condition import Condition, DataCondition
 
-# from sentry.workflow_engine.models.data_condition_group import DataConditionGroup
+# from sentry.workflow_engine.models.data_condition import DataCondition
 # from sentry.workflow_engine.models.data_source import DataSource
 from sentry.workflow_engine.types import DetectorPriorityLevel
 
@@ -112,8 +112,24 @@ class MetricAlertsDetectorValidator(BaseGroupTypeDetectorValidator):
     def update(self, instance, validated_data):
         instance.name = validated_data.get("name", instance.name)
         instance.type = validated_data.get("group_type", instance.group_type).slug
-        # data_conditions = validated_data.pop("data_conditions")
+        data_conditions = validated_data.pop("data_conditions")
         # TODO check id DCG logic_type needs to be updated ?
+        if data_conditions and instance.workflow_condition_group:
+            try:
+                data_condition = DataCondition.objects.get(
+                    condition_group=instance.workflow_condition_group
+                )
+            except DataCondition.DoesNotExist:
+                # should we create one if it doesn't exist or is there just a problem that it doesnt?
+                pass
+
+            updated_values = {
+                "type": data_conditions.get("type", data_condition.type),
+                "comparison": data_conditions.get("comparison", data_condition.comparison),
+                "condition_result": data_conditions.get("result", data_condition.condition_result),
+            }
+            # XXX: tests pass 'result' rather than 'condition_result' and it's backed up somewhere expecting 'result'
+            data_condition.update(**updated_values)
 
         # data_source = validated_data.pop("data_source")
         # if data_source:
