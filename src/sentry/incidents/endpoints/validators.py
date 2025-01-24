@@ -19,6 +19,9 @@ from sentry.workflow_engine.endpoints.validators.base import (
     NumericComparisonConditionValidator,
 )
 from sentry.workflow_engine.models.data_condition import Condition
+
+# from sentry.workflow_engine.models.data_condition_group import DataConditionGroup
+# from sentry.workflow_engine.models.data_source import DataSource
 from sentry.workflow_engine.types import DetectorPriorityLevel
 
 
@@ -92,8 +95,8 @@ class MetricAlertComparisonConditionValidator(NumericComparisonConditionValidato
 
 
 class MetricAlertsDetectorValidator(BaseGroupTypeDetectorValidator):
-    data_source = SnubaQueryDataSourceValidator(required=True)
-    data_conditions = MetricAlertComparisonConditionValidator(many=True)
+    data_source = SnubaQueryDataSourceValidator(required=True, many=True)
+    data_conditions = MetricAlertComparisonConditionValidator()
 
     def validate(self, attrs):
         """
@@ -103,7 +106,23 @@ class MetricAlertsDetectorValidator(BaseGroupTypeDetectorValidator):
         And this should be moved to a metric alert specific app, probably `incidents/`
         """
         attrs = super().validate(attrs)
-        conditions = attrs["data_conditions"]
-        if len(conditions) > 2:
-            raise serializers.ValidationError("Too many conditions")
+        # TODO should we limit the number of data sources?
         return attrs
+
+    def update(self, instance, validated_data):
+        instance.name = validated_data.get("name", instance.name)
+        instance.type = validated_data.get("group_type", instance.group_type).slug
+        # data_conditions = validated_data.pop("data_conditions")
+        # TODO check id DCG logic_type needs to be updated ?
+
+        # data_source = validated_data.pop("data_source")
+        # if data_source:
+        #     for source in data_source:
+        #         try:
+        #             source_instance = DataSource.objects.get(detector=instance)
+        #         except DataSource.DoesNotExist:
+        #             continue
+        # TODO get query based on the query_id / type and update accordingly
+
+        instance.save()
+        return instance

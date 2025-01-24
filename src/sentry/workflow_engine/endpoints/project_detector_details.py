@@ -1,4 +1,5 @@
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import PolymorphicProxySerializer, extend_schema
+from rest_framework import status
 from rest_framework.request import Request
 from rest_framework.response import Response
 
@@ -15,6 +16,8 @@ from sentry.apidocs.constants import (
     RESPONSE_UNAUTHORIZED,
 )
 from sentry.apidocs.parameters import DetectorParams, GlobalParams
+from sentry.issues import grouptype
+from sentry.workflow_engine.endpoints.project_detector_index import get_validator
 from sentry.workflow_engine.endpoints.serializers import DetectorSerializer
 from sentry.workflow_engine.models import Detector
 
@@ -69,3 +72,39 @@ class ProjectDetectorDetailsEndpoint(ProjectEndpoint):
             DetectorSerializer(),
         )
         return Response(serialized_detector)
+
+    @extend_schema(
+        operation_id="Update a Detector",
+        parameters=[
+            GlobalParams.ORG_ID_OR_SLUG,
+            GlobalParams.PROJECT_ID_OR_SLUG,
+            DetectorParams.DETECTOR_ID,
+        ],
+        request=PolymorphicProxySerializer(
+            "GenericDetectorSerializer",
+            serializers=[
+                gt.detector_validator for gt in grouptype.registry.all() if gt.detector_validator
+            ],
+            resource_type_field_name=None,
+        ),
+        responses={
+            200: DetectorSerializer,
+            400: RESPONSE_BAD_REQUEST,
+            401: RESPONSE_UNAUTHORIZED,
+            403: RESPONSE_FORBIDDEN,
+            404: RESPONSE_NOT_FOUND,
+        },
+    )
+    def put(self, request: Request, project, detector) -> Response:
+        """
+        Update a Detector
+        ````````````````
+        Update an existing detector for a project.
+        """
+        group_type = request.data.get("group_type") or detector.group_type
+        validator = get_validator(request, project, group_type, detector)
+        if not validator.is_valid():
+            return Response(validator.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        updated_detector = validator.save()
+        return Response(serialize(updated_detector, request.user), status=status.HTTP_200_OK)

@@ -20,6 +20,26 @@ from sentry.workflow_engine.endpoints.serializers import DetectorSerializer
 from sentry.workflow_engine.models import Detector
 
 
+def get_validator(request, project, group_type_slug, instance=None):
+    detector_type = grouptype.registry.get_by_slug(group_type_slug)
+    if detector_type is None:
+        raise ValidationError({"groupType": ["Unknown group type"]})
+
+    if detector_type.detector_validator is None:
+        raise ValidationError({"groupType": ["Group type not compatible with detectors"]})
+
+    return detector_type.detector_validator(
+        instance=instance,
+        context={
+            "project": project,
+            "organization": project.organization,
+            "request": request,
+            "access": request.access,
+        },
+        data=request.data,
+    )
+
+
 @region_silo_endpoint
 @extend_schema(tags=["Workflows"])
 class ProjectDetectorIndexEndpoint(ProjectEndpoint):
@@ -32,24 +52,6 @@ class ProjectDetectorIndexEndpoint(ProjectEndpoint):
     # TODO: We probably need a specific permission for detectors. Possibly specific detectors have different perms
     # too?
     permission_classes = (ProjectAlertRulePermission,)
-
-    def _get_validator(self, request, project, group_type_slug):
-        detector_type = grouptype.registry.get_by_slug(group_type_slug)
-        if detector_type is None:
-            raise ValidationError({"groupType": ["Unknown group type"]})
-
-        if detector_type.detector_validator is None:
-            raise ValidationError({"groupType": ["Group type not compatible with detectors"]})
-
-        return detector_type.detector_validator(
-            context={
-                "project": project,
-                "organization": project.organization,
-                "request": request,
-                "access": request.access,
-            },
-            data=request.data,
-        )
 
     @extend_schema(
         operation_id="Fetch a Project's Detectors",
@@ -118,7 +120,7 @@ class ProjectDetectorIndexEndpoint(ProjectEndpoint):
         if not group_type:
             raise ValidationError({"groupType": ["This field is required."]})
 
-        validator = self._get_validator(request, project, group_type)
+        validator = get_validator(request, project, group_type)
         if not validator.is_valid():
             return Response(validator.errors, status=status.HTTP_400_BAD_REQUEST)
 

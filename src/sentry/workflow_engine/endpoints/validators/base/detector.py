@@ -78,7 +78,9 @@ class BaseGroupTypeDetectorValidator(CamelSnakeSerializer):
                 request=self.context["request"],
                 organization=self.context["organization"],
                 target_object=detector.id,
-                event=audit_log.get_event_id("UPTIME_MONITOR_ADD"),
+                event=audit_log.get_event_id(
+                    "UPTIME_MONITOR_ADD"
+                ),  # TODO this is the wrong event type
                 data=detector.get_audit_log_data(),
             )
         return detector
