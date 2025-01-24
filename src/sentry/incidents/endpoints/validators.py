@@ -19,8 +19,8 @@ from sentry.workflow_engine.endpoints.validators.base import (
     NumericComparisonConditionValidator,
 )
 from sentry.workflow_engine.models.data_condition import Condition, DataCondition
+from sentry.workflow_engine.models.data_condition_group import DataConditionGroup
 
-# from sentry.workflow_engine.models.data_condition import DataCondition
 # from sentry.workflow_engine.models.data_source import DataSource
 from sentry.workflow_engine.types import DetectorPriorityLevel
 
@@ -109,27 +109,49 @@ class MetricAlertsDetectorValidator(BaseGroupTypeDetectorValidator):
         # TODO should we limit the number of data sources?
         return attrs
 
-    def update(self, instance, validated_data):
-        instance.name = validated_data.get("name", instance.name)
-        instance.type = validated_data.get("group_type", instance.group_type).slug
-        data_conditions = validated_data.pop("data_conditions")
-        # TODO check id DCG logic_type needs to be updated ?
-        if data_conditions and instance.workflow_condition_group:
+    def update_data_condition(self, instance, data_conditions):
+        """
+        Update the data condition if it already exists, create one if it does not
+        """
+        if instance.workflow_condition_group:
             try:
                 data_condition = DataCondition.objects.get(
                     condition_group=instance.workflow_condition_group
                 )
             except DataCondition.DoesNotExist:
-                # should we create one if it doesn't exist or is there just a problem that it doesnt?
-                pass
+                raise serializers.ValidationError("DataCondition not found, can't update")
 
+            # XXX: tests pass 'result' rather than 'condition_result' and it's checked by the NumericComparisonConditionValidator
             updated_values = {
                 "type": data_conditions.get("type", data_condition.type),
                 "comparison": data_conditions.get("comparison", data_condition.comparison),
                 "condition_result": data_conditions.get("result", data_condition.condition_result),
             }
-            # XXX: tests pass 'result' rather than 'condition_result' and it's backed up somewhere expecting 'result'
             data_condition.update(**updated_values)
+            return instance.workflow_condition_group
+
+        condition_group = DataConditionGroup.objects.create(
+            logic_type=DataConditionGroup.Type.ANY,
+            organization_id=self.context["organization"].id,
+        )
+        DataCondition.objects.create(
+            type=data_condition.get("type"),
+            comparison=data_condition.get("comparison"),
+            condition_result=data_condition.get("result"),
+            condition_group=condition_group,
+        )
+        return condition_group
+
+    def update(self, instance, validated_data):
+        instance.name = validated_data.get("name", instance.name)
+        instance.type = validated_data.get("group_type", instance.group_type).slug
+        data_conditions = validated_data.pop("data_conditions")
+        if data_conditions:
+            instance.workflow_condition_group = self.update_data_condition(
+                instance, data_conditions
+            )
+
+        # TODO check id DCG logic_type needs to be updated ?
 
         # data_source = validated_data.pop("data_source")
         # if data_source:
