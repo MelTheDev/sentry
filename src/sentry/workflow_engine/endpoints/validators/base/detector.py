@@ -45,6 +45,9 @@ class BaseGroupTypeDetectorValidator(CamelSnakeSerializer):
     def data_conditions(self) -> BaseDataConditionValidator:
         raise NotImplementedError
 
+    def update(self, instance, validated_data):
+        raise NotImplementedError
+
     def create(self, validated_data):
         with transaction.atomic(router.db_for_write(Detector)):
             condition_group = DataConditionGroup.objects.create(

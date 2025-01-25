@@ -12,7 +12,11 @@ from sentry.snuba.models import (
     SnubaQuery,
     SnubaQueryEventType,
 )
-from sentry.snuba.subscriptions import create_snuba_query, create_snuba_subscription
+from sentry.snuba.subscriptions import (
+    create_snuba_query,
+    create_snuba_subscription,
+    update_snuba_query,
+)
 from sentry.workflow_engine.endpoints.validators.base import (
     BaseDataSourceValidator,
     BaseGroupTypeDetectorValidator,
@@ -20,8 +24,7 @@ from sentry.workflow_engine.endpoints.validators.base import (
 )
 from sentry.workflow_engine.models.data_condition import Condition, DataCondition
 from sentry.workflow_engine.models.data_condition_group import DataConditionGroup
-
-# from sentry.workflow_engine.models.data_source import DataSource
+from sentry.workflow_engine.models.data_source import DataSource
 from sentry.workflow_engine.types import DetectorPriorityLevel
 
 
@@ -142,25 +145,51 @@ class MetricAlertsDetectorValidator(BaseGroupTypeDetectorValidator):
         )
         return condition_group
 
+    def update_data_source(self, instance, data_source):
+        for source in data_source:
+            try:
+                source_instance = DataSource.objects.get(detector=instance)
+            except DataSource.DoesNotExist:
+                continue
+            if source_instance:
+                try:
+                    snuba_query = SnubaQuery.objects.get(id=source_instance.query_id)
+                except SnubaQuery.DoesNotExist:
+                    continue  # raise?
+
+            # source_instance.update(**source) # is there anything passed to update on the DataSource?
+            # I guess we could be adding one?
+            update_snuba_query(
+                snuba_query=snuba_query,
+                query_type=source.get("query_type", snuba_query.type),
+                dataset=source.get("dataset", snuba_query.dataset),
+                query=source.get("query", snuba_query.query),
+                aggregate=source.get("aggregate", snuba_query.aggregate),
+                time_window=source.get("time_window", snuba_query.time_window),
+                resolution=timedelta(seconds=source.get("resolution", snuba_query.resolution)),
+                environment=source.get("environment", snuba_query.environment),
+                event_types=source.get(
+                    "event_types"
+                ),  # query SnubaQueryEventType by snuba query id
+            )
+
     def update(self, instance, validated_data):
         instance.name = validated_data.get("name", instance.name)
         instance.type = validated_data.get("group_type", instance.group_type).slug
-        data_conditions = validated_data.pop("data_conditions")
+        data_conditions = validated_data.pop(
+            "data_conditions"
+        )  # TODO this is not a m2m, should be updated to data_condition singular
         if data_conditions:
             instance.workflow_condition_group = self.update_data_condition(
                 instance, data_conditions
             )
+        # TODO check if DCG logic_type needs to be updated ?
 
-        # TODO check id DCG logic_type needs to be updated ?
-
-        # data_source = validated_data.pop("data_source")
-        # if data_source:
-        #     for source in data_source:
-        #         try:
-        #             source_instance = DataSource.objects.get(detector=instance)
-        #         except DataSource.DoesNotExist:
-        #             continue
-        # TODO get query based on the query_id / type and update accordingly
+        data_source = validated_data.pop(
+            "data_source"
+        )  # TODO this IS a m2m, should be updated to data_sources plural
+        if data_source:
+            self.update_data_source(instance, data_source)
 
         instance.save()
         return instance
