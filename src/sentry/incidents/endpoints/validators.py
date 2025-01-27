@@ -155,10 +155,9 @@ class MetricAlertsDetectorValidator(BaseGroupTypeDetectorValidator):
                 try:
                     snuba_query = SnubaQuery.objects.get(id=source_instance.query_id)
                 except SnubaQuery.DoesNotExist:
-                    continue  # raise?
+                    raise serializers.ValidationError("SnubaQuery not found, can't update")
 
-            # source_instance.update(**source) # is there anything passed to update on the DataSource?
-            # I guess we could be adding one?
+            event_types = SnubaQueryEventType.objects.filter(snuba_query_id=snuba_query.id)
             update_snuba_query(
                 snuba_query=snuba_query,
                 query_type=source.get("query_type", snuba_query.type),
@@ -168,10 +167,9 @@ class MetricAlertsDetectorValidator(BaseGroupTypeDetectorValidator):
                 time_window=source.get("time_window", timedelta(seconds=snuba_query.time_window)),
                 resolution=timedelta(seconds=source.get("resolution", snuba_query.resolution)),
                 environment=source.get("environment", snuba_query.environment),
-                event_types=source.get(
-                    "event_types"
-                ),  # query SnubaQueryEventType by snuba query id
+                event_types=source.get("event_types", [event_types]),
             )
+            # TODO handle adding an additional DataSource
 
     def update(self, instance, validated_data):
         instance.name = validated_data.get("name", instance.name)
