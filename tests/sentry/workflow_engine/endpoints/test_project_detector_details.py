@@ -80,7 +80,7 @@ class ProjectDetectorDetailsGetTest(ProjectDetectorDetailsBaseTest):
 
 
 @region_silo_test
-class ProjectDetectorDetailsPostTest(ProjectDetectorDetailsGetTest):
+class ProjectDetectorDetailsPutTest(ProjectDetectorDetailsBaseTest):
     method = "PUT"
 
     def setUp(self):

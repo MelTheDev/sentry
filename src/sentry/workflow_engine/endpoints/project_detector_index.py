@@ -119,7 +119,6 @@ class ProjectDetectorIndexEndpoint(ProjectEndpoint):
         group_type = request.data.get("group_type")
         if not group_type:
             raise ValidationError({"groupType": ["This field is required."]})
-
         validator = get_validator(request, project, group_type)
         if not validator.is_valid():
             return Response(validator.errors, status=status.HTTP_400_BAD_REQUEST)
