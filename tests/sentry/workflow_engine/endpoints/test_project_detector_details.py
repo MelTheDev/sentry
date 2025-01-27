@@ -1,5 +1,7 @@
 from datetime import timedelta
 
+import pytest
+
 from sentry.api.serializers import serialize
 from sentry.incidents.grouptype import MetricAlertFire
 from sentry.incidents.utils.constants import INCIDENTS_SNUBA_SUBSCRIPTION_TYPE
@@ -19,6 +21,7 @@ from sentry.workflow_engine.models.data_condition import Condition
 from sentry.workflow_engine.types import DetectorPriorityLevel
 
 
+@pytest.mark.snuba_ci
 class ProjectDetectorDetailsBaseTest(APITestCase):
     endpoint = "sentry-api-0-project-detector-details"
 
