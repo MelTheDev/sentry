@@ -186,7 +186,6 @@ class MetricAlertsDetectorValidator(BaseGroupTypeDetectorValidator):
             instance.workflow_condition_group = self.update_data_conditions(
                 instance, data_conditions
             )
-        # TODO check if DCG logic_type needs to be updated ?
 
         data_source = validated_data.pop(
             "data_source"
