@@ -196,7 +196,7 @@ def backfill_seer_grouping_records_for_project(
 
     if len(groups_to_backfill_with_no_embedding) == 0:
         call_next_backfill(
-            last_processed_group_id=batch_end_id,
+            last_processed_group_id=None,
             project_id=current_project_id,
             last_processed_project_index=last_processed_project_index,
             cohort=cohort,
