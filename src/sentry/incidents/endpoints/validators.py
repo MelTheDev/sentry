@@ -99,7 +99,7 @@ class MetricAlertComparisonConditionValidator(NumericComparisonConditionValidato
 
 class MetricAlertsDetectorValidator(BaseGroupTypeDetectorValidator):
     data_source = SnubaQueryDataSourceValidator(required=True, many=True)
-    data_conditions = MetricAlertComparisonConditionValidator()
+    data_conditions = MetricAlertComparisonConditionValidator(many=True)
 
     def validate(self, attrs):
         """
@@ -109,41 +109,48 @@ class MetricAlertsDetectorValidator(BaseGroupTypeDetectorValidator):
         And this should be moved to a metric alert specific app, probably `incidents/`
         """
         attrs = super().validate(attrs)
+        conditions = attrs["data_conditions"]
+        if len(conditions) > 2:
+            raise serializers.ValidationError("Too many conditions")
         # TODO should we limit the number of data sources?
         return attrs
 
-    def update_data_condition(self, instance, data_conditions):
+    def update_data_conditions(self, instance, data_conditions):
         """
         Update the data condition if it already exists, create one if it does not
         """
         if instance.workflow_condition_group:
             try:
-                data_condition = DataCondition.objects.get(
-                    condition_group=instance.workflow_condition_group
+                data_condition_group = DataConditionGroup.objects.get(
+                    id=instance.workflow_condition_group.id
                 )
-            except DataCondition.DoesNotExist:
-                raise serializers.ValidationError("DataCondition not found, can't update")
+            except DataConditionGroup.DoesNotExist:
+                raise serializers.ValidationError("DataConditionGroup not found, can't update")
+        # else make one if data is passed?
 
-            # XXX: tests pass 'result' rather than 'condition_result' and it's checked by the NumericComparisonConditionValidator
+        for data_condition in data_conditions:
+            current_data_condition = DataCondition.objects.get(
+                id=data_condition.get("id"), condition_group=data_condition_group
+            )
+            # XXX: we pass 'result' rather than 'condition_result' - enforced by the NumericComparisonConditionValidator
             updated_values = {
-                "type": data_conditions.get("type", data_condition.type),
-                "comparison": data_conditions.get("comparison", data_condition.comparison),
-                "condition_result": data_conditions.get("result", data_condition.condition_result),
+                "type": data_condition.get("type", current_data_condition.type),
+                "comparison": data_condition.get("comparison", current_data_condition.comparison),
+                "condition_result": data_condition.get(
+                    "result", current_data_condition.condition_result
+                ),
             }
-            data_condition.update(**updated_values)
+            if current_data_condition:
+                data_condition.update(**updated_values)
             return instance.workflow_condition_group
 
-        condition_group = DataConditionGroup.objects.create(
-            logic_type=DataConditionGroup.Type.ANY,
-            organization_id=self.context["organization"].id,
-        )
-        DataCondition.objects.create(
-            type=data_condition.get("type"),
-            comparison=data_condition.get("comparison"),
-            condition_result=data_condition.get("result"),
-            condition_group=condition_group,
-        )
-        return condition_group
+            DataCondition.objects.create(
+                type=data_conditions.get("type"),
+                comparison=data_conditions.get("comparison"),
+                condition_result=data_conditions.get("result"),
+                workflow_condition_group=data_condition_group,
+            )
+        return data_condition_group
 
     def update_data_source(self, instance, data_source):
         for source in data_source:
@@ -174,11 +181,9 @@ class MetricAlertsDetectorValidator(BaseGroupTypeDetectorValidator):
     def update(self, instance, validated_data):
         instance.name = validated_data.get("name", instance.name)
         instance.type = validated_data.get("group_type", instance.group_type).slug
-        data_conditions = validated_data.pop(
-            "data_conditions"
-        )  # TODO this is not a m2m, should be updated to data_condition singular
+        data_conditions = validated_data.pop("data_conditions")
         if data_conditions:
-            instance.workflow_condition_group = self.update_data_condition(
+            instance.workflow_condition_group = self.update_data_conditions(
                 instance, data_conditions
             )
         # TODO check if DCG logic_type needs to be updated ?

@@ -104,11 +104,14 @@ class ProjectDetectorDetailsPutTest(ProjectDetectorDetailsBaseTest):
                     ],
                 }
             ],
-            "data_conditions": {
-                "type": Condition.GREATER,
-                "comparison": 100,
-                "result": DetectorPriorityLevel.HIGH,
-            },
+            "data_conditions": [
+                {
+                    "id": self.condition.id,
+                    "type": Condition.GREATER,
+                    "comparison": 100,
+                    "result": DetectorPriorityLevel.HIGH,
+                }
+            ],
         }
 
     def test_update(self):
