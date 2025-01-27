@@ -144,6 +144,14 @@ class ProjectDetectorDetailsPutTest(ProjectDetectorDetailsBaseTest):
 
     def test_update_missing_data_condition(self):
         """
-        Edge case - workflow_data_condition field is nullable
+        Edge case - ensure we raise if the DataCondition can't be found
         """
-        pass
+        DataCondition.objects.get(id=self.condition.id).delete()
+        with self.tasks():
+            self.get_error_response(
+                self.organization.slug,
+                self.project.slug,
+                self.detector.id,
+                **self.valid_data,
+                status_code=400,
+            )
