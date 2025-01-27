@@ -165,7 +165,7 @@ class MetricAlertsDetectorValidator(BaseGroupTypeDetectorValidator):
                 dataset=source.get("dataset", snuba_query.dataset),
                 query=source.get("query", snuba_query.query),
                 aggregate=source.get("aggregate", snuba_query.aggregate),
-                time_window=source.get("time_window", snuba_query.time_window),
+                time_window=source.get("time_window", timedelta(seconds=snuba_query.time_window)),
                 resolution=timedelta(seconds=source.get("resolution", snuba_query.resolution)),
                 environment=source.get("environment", snuba_query.environment),
                 event_types=source.get(
