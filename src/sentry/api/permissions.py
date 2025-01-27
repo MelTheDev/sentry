@@ -25,7 +25,7 @@ from sentry.organizations.services.organization import (
     RpcUserOrganizationContext,
     organization_service,
 )
-from sentry.utils import auth
+from sentry.utils import auth, demo_mode
 
 if TYPE_CHECKING:
     from sentry.models.organization import Organization
@@ -213,6 +213,10 @@ class SentryPermission(ScopedPermission):
 
         # TODO(iamrajjoshi): Remove this check once we have fully migrated to the new data secrecy logic
         organization = org_context.organization
+
+        if demo_mode.is_readonly_user(request.user):
+            org_context.member.scopes = demo_mode.get_readonly_scopes()
+
         if (
             request.user
             and request.user.is_superuser
@@ -284,3 +288,15 @@ class SentryPermission(ScopedPermission):
                     extra=extra,
                 )
                 raise MemberDisabledOverLimit(organization)
+
+    def has_permission(self, request: Request, view: object) -> bool:
+        if demo_mode.is_readonly_user(request.user) and request.method not in ("GET", "HEAD"):
+            return False
+
+        return super().has_permission(request, view)
+
+    def has_object_permission(self, request: Request, view: object | None, obj: Any) -> bool:
+        if demo_mode.is_readonly_user(request.user) and request.method not in ("GET", "HEAD"):
+            return False
+
+        return super().has_object_permission(request, view, obj)
