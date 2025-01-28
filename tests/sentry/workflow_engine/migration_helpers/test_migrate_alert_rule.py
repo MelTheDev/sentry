@@ -20,6 +20,7 @@ from sentry.workflow_engine.migration_helpers.alert_rule import (
     dual_delete_migrated_alert_rule,
     dual_delete_migrated_alert_rule_trigger,
     dual_delete_migrated_alert_rule_trigger_action,
+    dual_update_migrated_alert_rule,
     get_action_filter,
     get_detector_trigger,
     get_resolve_threshold,
@@ -27,7 +28,6 @@ from sentry.workflow_engine.migration_helpers.alert_rule import (
     migrate_metric_action,
     migrate_metric_data_conditions,
     migrate_resolve_threshold_data_conditions,
-    update_migrated_alert_rule,
 )
 from sentry.workflow_engine.models import (
     Action,
@@ -399,7 +399,7 @@ class AlertRuleMigrationHelpersTest(APITestCase):
         )  # so we can confirm that our update actually changes things
         assert detector_state.active
 
-        update_migrated_alert_rule(self.metric_alert, updated_fields)
+        dual_update_migrated_alert_rule(self.metric_alert, updated_fields)
         detector.refresh_from_db()
         detector_state.refresh_from_db()
 
@@ -420,7 +420,7 @@ class AlertRuleMigrationHelpersTest(APITestCase):
         assert detector.owner_user_id == self.metric_alert.user_id
         assert detector.owner_team_id == self.metric_alert.team_id
 
-        update_migrated_alert_rule(self.metric_alert, updated_fields)
+        dual_update_migrated_alert_rule(self.metric_alert, updated_fields)
         detector.refresh_from_db()
 
         assert detector.owner_user_id == self.user.id
@@ -446,7 +446,7 @@ class AlertRuleMigrationHelpersTest(APITestCase):
             "comparison_delta": None,
         }
 
-        update_migrated_alert_rule(self.metric_alert, updated_fields)
+        dual_update_migrated_alert_rule(self.metric_alert, updated_fields)
         detector.refresh_from_db()
 
         assert detector.config == updated_fields
@@ -470,7 +470,7 @@ class AlertRuleMigrationHelpersTest(APITestCase):
         assert resolve_detector_trigger.type == Condition.LESS_OR_EQUAL
 
         updated_fields = {"threshold_type": AlertRuleThresholdType.BELOW}
-        update_migrated_alert_rule(metric_alert, updated_fields)
+        dual_update_migrated_alert_rule(metric_alert, updated_fields)
 
         critical_detector_trigger.refresh_from_db()
         resolve_detector_trigger.refresh_from_db()
@@ -489,7 +489,7 @@ class AlertRuleMigrationHelpersTest(APITestCase):
         assert resolve_detector_trigger.comparison == 2
 
         updated_fields = {"resolve_threshold": 10}
-        update_migrated_alert_rule(self.metric_alert, updated_fields)
+        dual_update_migrated_alert_rule(self.metric_alert, updated_fields)
         resolve_detector_trigger.refresh_from_db()
 
         assert resolve_detector_trigger.comparison == 10
