@@ -295,8 +295,6 @@ class AzureDevOpsActionTranslator(TicketActionTranslator):
 
 
 class JiraActionTranslatorBase(TicketActionTranslator):
-    action_type = Action.Type.JIRA
-
     @property
     def required_fields(self) -> list[str]:
         return ["integration", "project", "issuetype"]
