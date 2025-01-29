@@ -294,13 +294,7 @@ class AzureDevOpsActionTranslator(TicketActionTranslator):
         return AzureDevOpsDataBlob
 
 
-@issue_alert_action_translator_registry.register(
-    "sentry.integrations.jira.notify_action.JiraCreateTicketAction"
-)
-@issue_alert_action_translator_registry.register(
-    "sentry.integrations.jira_server.notify_action.JiraServerCreateTicketAction"
-)
-class JiraActionTranslator(TicketActionTranslator):
+class JiraActionTranslatorBase(TicketActionTranslator):
     action_type = Action.Type.JIRA
 
     @property
@@ -332,6 +326,20 @@ class JiraActionTranslator(TicketActionTranslator):
             }
             data["additional_fields"] = additional_fields
         return data
+
+
+@issue_alert_action_translator_registry.register(
+    "sentry.integrations.jira.notify_action.JiraCreateTicketAction"
+)
+class JiraActionTranslator(JiraActionTranslatorBase):
+    action_type = Action.Type.JIRA
+
+
+@issue_alert_action_translator_registry.register(
+    "sentry.integrations.jira_server.notify_action.JiraServerCreateTicketAction"
+)
+class JiraServerActionTranslator(JiraActionTranslatorBase):
+    action_type = Action.Type.JIRA_SERVER
 
 
 @dataclass
