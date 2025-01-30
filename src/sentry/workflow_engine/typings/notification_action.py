@@ -6,6 +6,7 @@ from typing import Any, ClassVar
 from sentry.integrations.opsgenie.client import OPSGENIE_DEFAULT_PRIORITY
 from sentry.integrations.pagerduty.client import PAGERDUTY_DEFAULT_SEVERITY
 from sentry.notifications.models.notificationaction import ActionTarget
+from sentry.notifications.types import ActionTargetType, FallthroughChoiceType
 from sentry.utils.registry import Registry
 from sentry.workflow_engine.models.action import Action
 
@@ -48,12 +49,12 @@ class BaseActionTranslator(ABC):
 
     @property
     @abstractmethod
-    def integration_id(self) -> Any | None:
+    def integration_id(self) -> int | None:
         """Return the integration ID for this action, if any"""
         pass
 
     @property
-    def target_identifier(self) -> str | None:
+    def target_identifier(self) -> str | int | None:
         """Return the target identifier for this action, if any"""
         return None
 
@@ -301,6 +302,60 @@ class AzureDevOpsActionTranslator(TicketActionTranslator):
         return AzureDevOpsDataBlob
 
 
+@issue_alert_action_translator_registry.register("sentry.mail.actions.NotifyEmailAction")
+class EmailActionTranslator(BaseActionTranslator):
+    action_type = Action.Type.EMAIL
+
+    @property
+    def required_fields(self) -> list[str]:
+        return ["targetType"]
+
+    @property
+    def target_type(self) -> ActionTarget:
+        # If the targetType is Member, then set the target_type to User,
+        # if the targetType is Team, then set the target_type to Team,
+        # otherwise return None (this would be for IssueOwners (suggested assignees))
+
+        target_type = self.action.get("targetType")
+        if target_type == ActionTargetType.MEMBER.value:
+            return ActionTarget.USER
+        elif target_type == ActionTargetType.TEAM.value:
+            return ActionTarget.TEAM
+        elif target_type == ActionTargetType.ISSUE_OWNERS.value:
+            return ActionTarget.ISSUE_OWNERS
+        return None
+
+    @property
+    def integration_id(self) -> Any | None:
+        return None
+
+    @property
+    def target_identifier(self) -> str | None:
+        target_type = self.action.get("targetType")
+        if target_type in [ActionTargetType.MEMBER.value, ActionTargetType.TEAM.value]:
+            return self.action.get("targetIdentifier")
+        return None
+
+    @property
+    def blob_type(self) -> type["DataBlob"] | None:
+        target_type = self.action.get("targetType")
+        if target_type == ActionTargetType.ISSUE_OWNERS.value:
+            return EmailDataBlob
+        return None
+
+    def get_sanitized_data(self) -> dict[str, Any]:
+        """Override to handle the special case of IssueOwners target type"""
+        if self.action.get("targetType") == ActionTargetType.ISSUE_OWNERS.value:
+            return dataclasses.asdict(
+                EmailDataBlob(
+                    fallthroughType=self.action.get(
+                        "fallthroughType", FallthroughChoiceType.ACTIVE_MEMBERS.value
+                    )
+                )
+            )
+        return {}
+
+
 @dataclass
 class DataBlob:
     """DataBlob is a generic type that represents the data blob for a notification action."""
@@ -359,3 +414,10 @@ class AzureDevOpsDataBlob(TicketDataBlob):
 
     project: str = ""
     work_item_type: str = ""
+
+
+@dataclass
+class EmailDataBlob(DataBlob):
+    """EmailDataBlob represents the data blob for an email notification action."""
+
+    fallthroughType: str = ""
