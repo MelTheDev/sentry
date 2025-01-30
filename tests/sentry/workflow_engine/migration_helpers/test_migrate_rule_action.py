@@ -1141,6 +1141,7 @@ class TestNotificationActionMigrationUtils(TestCase):
                 {
                     "id": "sentry.mail.actions.NotifyEmailAction",
                     "uuid": "test-uuid",
+                    "targetType": "IssueOwners",
                 },
                 Action.Type.EMAIL,
             ),
